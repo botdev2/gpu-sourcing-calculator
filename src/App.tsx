@@ -213,33 +213,16 @@ export function App() {
 
   return (
     <>
-      <header className="mast">
+      <header className="top">
         <div>
-          <p className="eyebrow">Sourcing desk · sheet 01</p>
           <h1>Busbar</h1>
-          <p className="lede">
-            GPU and datacenter component sourcing. Every figure is a source price: list plus 20%. List is left out of
-            the desk, the export, and the quote schema.
-          </p>
+          <p className="lede">GPU and datacenter sourcing. Every figure is list plus 20%. List stays off the desk.</p>
         </div>
-        <dl className="sheet">
-          <div>
-            <dt>Rev</dt>
-            <dd>1.0.0</dd>
-          </div>
-          <div>
-            <dt>Basis</dt>
-            <dd>Nov 2026</dd>
-          </div>
-          <div>
-            <dt>Markup</dt>
-            <dd>+20%</dd>
-          </div>
-          <div>
-            <dt>List</dt>
-            <dd>Omitted</dd>
-          </div>
-        </dl>
+        <ul className="meta">
+          <li>Nov 2026</li>
+          <li>+20%</li>
+          <li>List omitted</li>
+        </ul>
       </header>
 
       <main className="desk">
@@ -262,9 +245,17 @@ export function App() {
 
             {fixed ? (
               <ul className="spec">
-                {(mission.profile === "config1" ? CONFIG_1 : CONFIG_2).map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
+                {(mission.profile === "config1" ? CONFIG_1 : CONFIG_2).map((line) => {
+                  const cut = line.indexOf(": ")
+                  const label = cut > 0 ? line.slice(0, cut) : line
+                  const value = cut > 0 ? line.slice(cut + 2) : ""
+                  return (
+                    <li key={line}>
+                      <span>{label}</span>
+                      {value ? <strong>{value}</strong> : null}
+                    </li>
+                  )
+                })}
               </ul>
             ) : rackScale ? (
               <Field label="NVL72 racks" hint="Each rack includes 72 GPUs.">
@@ -506,6 +497,7 @@ export function App() {
           </div>
         </section>
 
+        <div className="work">
         <section className="panel bill">
           <h2>Bill of materials</h2>
           {manual ? (
@@ -539,21 +531,25 @@ export function App() {
                     </tr>
                     {group.lines.map((line) => (
                       <tr key={line.sku}>
-                        <td>
+                        <td className="part" data-label="Component">
                           <strong>{line.name}</strong>
                           <span>{line.spec}</span>
                         </td>
-                        <td className="source">
+                        <td className="source" data-label="Source">
                           {line.source?.url ? (
                             <a href={line.source.url} target="_blank" rel="noreferrer">
                               {line.source.name}
                             </a>
                           ) : (
-                            <span>{line.source?.name || "Planning figure"}</span>
+                            <span className="src-name">{line.source?.name || "Planning figure"}</span>
                           )}
-                          {line.source ? <span>{line.source.note}</span> : <span>No distributor page checked.</span>}
+                          {line.source ? (
+                            <span title={line.source.note}>{line.source.note}</span>
+                          ) : (
+                            <span>No distributor page checked.</span>
+                          )}
                         </td>
-                        <td className="num">
+                        <td className="num" data-label="Qty">
                           <input
                             aria-label={`${line.name} quantity`}
                             type="number"
@@ -566,10 +562,18 @@ export function App() {
                             onWheel={(event) => event.currentTarget.blur()}
                           />
                         </td>
-                        <td className="num">{line.spareQty}</td>
-                        <td className="num">{shownPrice(line.priceStatus, line.sourceUnitPrice)}</td>
-                        <td className="num">{shownPrice(line.priceStatus, line.sourceLineTotal)}</td>
-                        <td className="num">{line.leadWeeks ? `${line.leadWeeks}w` : "—"}</td>
+                        <td className="num" data-label="Spares">
+                          {line.spareQty}
+                        </td>
+                        <td className="num" data-label="Each">
+                          {shownPrice(line.priceStatus, line.sourceUnitPrice)}
+                        </td>
+                        <td className="num" data-label="Line">
+                          {shownPrice(line.priceStatus, line.sourceLineTotal)}
+                        </td>
+                        <td className="num" data-label="Lead">
+                          {line.leadWeeks ? `${line.leadWeeks}w` : "—"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -705,14 +709,12 @@ export function App() {
             </div>
           )}
         </section>
+        </div>
       </main>
 
       <section className="schema-wrap">
         <div className="schema-head">
-          <div>
-            <p className="eyebrow">Schema</p>
-            <h2>Quote schema and rack schema</h2>
-          </div>
+          <h2>Schema</h2>
           <div className="seg" role="group" aria-label="Schema view">
             <button type="button" aria-pressed={tab === "rack"} onClick={() => setTab("rack")}>
               Rack schema
