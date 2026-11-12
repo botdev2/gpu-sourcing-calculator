@@ -10,7 +10,7 @@ export const quoteSchema = {
   $id: SCHEMA_ID,
   title: "SourcingQuote",
   description:
-    "Datacenter component sourcing quote. Money fields are source prices, which are list plus 20%. List and retail amounts are not part of this schema.",
+    "Datacenter component sourcing quote. Amounts are USD.",
   type: "object",
   additionalProperties: false,
   required: [

@@ -255,7 +255,7 @@ export function priceQuote({ lines, mission, catalog }) {
       display: "source",
       listMarkupPercent: 20,
       listPriceIncluded: false,
-      note: "Source price is list plus 20%. List is omitted from this document.",
+      note: "Planning figures for November 2026. Confirm before a purchase order.",
     },
     mission: cleaned,
     lines: publicLines,

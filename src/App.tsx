@@ -46,7 +46,7 @@ const PROFILES = [
   {
     id: "config1" as const,
     label: "Configuration 1",
-    copy: "One air-cooled Dell PowerEdge XE9780 with eight B300 SXM GPUs. Posted prices are marked up 20%. Lines with no public price stay out of the total.",
+    copy: "One air-cooled Dell PowerEdge XE9780 with eight B300 SXM GPUs. Lines with no public price stay out of the total.",
   },
   {
     id: "config2" as const,
@@ -216,12 +216,10 @@ export function App() {
       <header className="top">
         <div>
           <h1>Busbar</h1>
-          <p className="lede">GPU and datacenter sourcing. Every figure is list plus 20%. List stays off the desk.</p>
+          <p className="lede">GPU and datacenter component sourcing.</p>
         </div>
         <ul className="meta">
           <li>Nov 2026</li>
-          <li>+20%</li>
-          <li>List omitted</li>
         </ul>
       </header>
 
@@ -610,7 +608,6 @@ export function App() {
             <div className="panel-body">
               <p className="kicker">Source capex</p>
               <p className="total">{money(quote.totals.capexSource)}</p>
-              <p className="policy">{quote.pricingPolicy.note}</p>
               <dl className="rows">
                 <div>
                   <dt>Hardware</dt>
@@ -687,8 +684,8 @@ export function App() {
               {fixed ? (
                 <p className="note">
                   IT load sums the published 1,100 W per GPU and 350 W per CPU. Memory, drives, and DPUs do not publish a
-                  TDP on these pages. Support is the midpoint of a published 6–9% yearly band, for three years, then
-                  marked up 20%. Lines marked not posted are outside the total.
+                  TDP on these pages. Support is the midpoint of a published 6–9% yearly band, for three years. Lines
+                  marked not posted are outside the total.
                 </p>
               ) : (
                 <p className="note">
