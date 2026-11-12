@@ -4,7 +4,7 @@ Planning desk for GPU and datacenter component sourcing.
 
 Quotes use a **source price**, which is list plus 20%. List is not stored in this repository, not shown in the desk, and not present on the quote schema. The schema is [JSON Schema draft 2020-12](https://json-schema.org/draft/2020-12/schema). A quote is returned only when it validates.
 
-Figures are a November 2026 planning basis, not a live distributor feed.
+Figures are a November 2026 planning basis, not a live distributor feed, except Configuration 1 and the Giga G894 sheet. Those two bills cite the page each priced line came from. The number on the desk is still 20% above the posted figure, and that posted figure is not shown. Lines with no public price are marked and left out of the total.
 
 ## Run
 

@@ -63,7 +63,7 @@ export const quoteSchema = {
         "utilization",
       ],
       properties: {
-        profile: { enum: ["training", "inference", "rack"] },
+        profile: { enum: ["config1", "config2", "training", "inference", "rack"] },
         acceleratorId: { type: "string" },
         nodes: { type: "integer", minimum: 1, maximum: 256 },
         gpusPerNode: { enum: [4, 8] },
@@ -113,6 +113,18 @@ export const quoteSchema = {
           sourceLineTotal: { type: "integer", minimum: 0 },
           leadWeeks: { type: "integer", minimum: 0 },
           tdpW: { type: "number", minimum: 0 },
+          priceStatus: { enum: ["sourced", "included", "unpriced", "estimated", "planning"] },
+          source: {
+            type: "object",
+            additionalProperties: false,
+            required: ["name", "url", "retrieved", "note"],
+            properties: {
+              name: { type: "string" },
+              url: { type: "string" },
+              retrieved: { type: "string" },
+              note: { type: "string" },
+            },
+          },
         },
       },
     },

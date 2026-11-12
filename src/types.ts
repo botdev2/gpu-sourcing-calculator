@@ -19,7 +19,7 @@ export type CatalogItem = {
 }
 
 export type Mission = {
-  profile: "training" | "inference" | "rack"
+  profile: "config1" | "config2" | "training" | "inference" | "rack"
   acceleratorId: string
   nodes: number
   gpusPerNode: 4 | 8
@@ -51,6 +51,8 @@ export type QuoteLine = {
   sourceLineTotal: number
   leadWeeks: number
   tdpW: number
+  priceStatus?: "sourced" | "included" | "unpriced" | "estimated" | "planning"
+  source?: { name: string; url: string; retrieved: string; note: string }
 }
 
 export type RackBlock = { sku: string; name: string; u: number; role: Category }

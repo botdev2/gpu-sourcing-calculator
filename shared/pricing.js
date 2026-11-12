@@ -22,7 +22,7 @@ function clampNum(value, min, max, fallback) {
 }
 
 export function cleanMission(input = {}) {
-  const profile = input.profile === "inference" || input.profile === "rack" ? input.profile : "training"
+  const profile = ["config1", "config2", "inference", "rack"].includes(input.profile) ? input.profile : "training"
   return {
     profile,
     acceleratorId: String(input.acceleratorId || "").slice(0, 64),
@@ -56,6 +56,7 @@ function round2(n) {
 function spareQtyFor(item, qty, pct) {
   if (qty <= 0 || pct <= 0) return 0
   if (item.form === "rack" || item.id === "nvl72") return 0
+  if (item.priceStatus === "unpriced" || item.priceStatus === "included" || item.priceStatus === "estimated") return 0
   if (SPARE.has(item.category) || item.id.startsWith("nic-") || item.id.startsWith("dac-")) {
     return Math.ceil((qty * pct) / 100)
   }
@@ -74,7 +75,7 @@ function placeRacks(pricedLines, byId, mission) {
         title: `NVL72 ${i + 1}`,
         u: 42,
         blocks: [{ sku: "nvl72", name: "NVL72 · 72 GPU", u: 42, role: "accelerator" }],
-        zeroU: ["2× metered PDU"],
+        zeroU: qtyOf("pdu-60a") > 0 ? ["2× metered PDU"] : [],
       })
     }
     const switches = qtyOf("sw-sn5600")
@@ -93,7 +94,7 @@ function placeRacks(pricedLines, byId, mission) {
           title: `Fabric ${i + 1}`,
           u: 42,
           blocks: slice,
-          zeroU: ["2× metered PDU"],
+          zeroU: qtyOf("pdu-60a") > 0 ? ["2× metered PDU"] : [],
         })
       }
     }
@@ -106,7 +107,7 @@ function placeRacks(pricedLines, byId, mission) {
     title: `Rack ${i + 1}`,
     u: 42,
     blocks: [],
-    zeroU: ["2× metered PDU"],
+    zeroU: qtyOf("pdu-60a") > 0 ? ["2× metered PDU"] : [],
     used: 0,
   }))
 
@@ -192,6 +193,8 @@ export function priceQuote({ lines, mission, catalog }) {
       tdpW: item.tdpW,
       hbmGb: item.hbmGb,
       gpusIncluded: item.gpusIncluded,
+      priceStatus: item.priceStatus || "planning",
+      source: item.source,
     })
   }
 
@@ -211,9 +214,11 @@ export function priceQuote({ lines, mission, catalog }) {
   const gpuCount = priced.reduce((sum, line) => sum + line.qty * (line.gpusIncluded || 0), 0)
   const hbmGb = priced.reduce((sum, line) => sum + line.qty * (line.hbmGb || 0), 0)
   const nodeCount = priced.filter((line) => line.category === "chassis").reduce((sum, line) => sum + line.qty, 0)
-  const racks = priced
+  const racksFromLines = priced
     .filter((line) => line.sku === "rack-42" || line.sku === "nvl72")
     .reduce((sum, line) => sum + line.qty, 0)
+  const hasChassis = priced.some((line) => byId[line.sku]?.category === "chassis" && byId[line.sku]?.rackU > 0)
+  const racks = racksFromLines || (hasChassis ? 1 : 0)
   const nodeKw = nodeCount > 0 ? round2(itKw / nodeCount) : round2(itKw / Math.max(racks, 1))
   const critical = priced.reduce((best, line) => (line.leadWeeks > (best?.leadWeeks || 0) ? line : best), null)
   const rackBudgetKw = priced.some((line) => line.sku === "nvl72") ? 120 : priced.some((line) => line.sku === "cdu-inrack") ? 80 : 15
@@ -223,19 +228,24 @@ export function priceQuote({ lines, mission, catalog }) {
   const sourcePerGpuHour = gpuHours > 0 ? round3(capexSource / gpuHours) : 0
   const allInPerGpuHour = gpuHours > 0 ? round3(allInSource / gpuHours) : 0
 
-  const publicLines = priced.map((line) => ({
-    sku: line.sku,
-    name: line.name,
-    category: line.category,
-    spec: line.spec,
-    unit: line.unit,
-    qty: line.qty,
-    spareQty: line.spareQty,
-    sourceUnitPrice: line.sourceUnitPrice,
-    sourceLineTotal: line.sourceLineTotal,
-    leadWeeks: line.leadWeeks,
-    tdpW: line.tdpW,
-  }))
+  const publicLines = priced.map((line) => {
+    const published = {
+      sku: line.sku,
+      name: line.name,
+      category: line.category,
+      spec: line.spec,
+      unit: line.unit,
+      qty: line.qty,
+      spareQty: line.spareQty,
+      sourceUnitPrice: line.sourceUnitPrice,
+      sourceLineTotal: line.sourceLineTotal,
+      leadWeeks: line.leadWeeks,
+      tdpW: line.tdpW,
+      priceStatus: line.priceStatus || "planning",
+    }
+    if (line.source) published.source = line.source
+    return published
+  })
 
   return {
     schemaVersion: "1.0.0",

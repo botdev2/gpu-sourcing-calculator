@@ -14,7 +14,45 @@ const GROUPS: { id: Quote["lines"][number]["category"]; label: string }[] = [
   { id: "facility", label: "Facility" },
 ]
 
+const CONFIG_1 = [
+  "Server: Dell PowerEdge XE9780",
+  "GPU platform: NVIDIA HGX B300 NVL8, air-cooled",
+  "GPUs: 8× NVIDIA B300 SXM, 1,100 W each",
+  "CPU: 2× Intel Xeon 6 6767P, 64 cores / 128 threads, 2.4 GHz",
+  "RAM: 32× 96 GB DDR5-6400 RDIMM, 3,072 GB",
+  "Boot: BOSS-N1 with 2× 480 GB SSDs in RAID 1",
+  "Data: 1.6 TB enterprise NVMe",
+  "Networking: 2× NVIDIA BlueField-3, dual-port 400GbE/NDR",
+  "Power: 12× 3200 W hot-plug supplies, 6+6",
+  "Management: iDRAC10 Datacenter",
+  "OS: none included",
+  "Support: 36 months basic next-business-day, estimated",
+]
+
+const CONFIG_2 = [
+  "Base: Giga Computing G894-SD3-AAX7, 8U, 8× B300 HGX",
+  "CPU: 2× Intel Xeon 6776P, 64 cores, 2.3 GHz, 350 W",
+  "RAM: 32× 128 GB DDR5-6400",
+  "Boot: 2× 960 GB PCIe Gen4 M.2",
+  "Data: 8× 3.84 TB PM9D3a",
+  "GPU ports: 8× 800 Gb/s OSFP, included on the HGX board",
+  "DPU: 1× NVIDIA BlueField-3 BF3220, 200GbE/NDR200",
+  "Power: 12× 3000 W 80+ Titanium, 6+6, price not posted",
+  "Cords: 12× C19, price not posted",
+  "Assembly and test: quantity 1, price not posted",
+]
+
 const PROFILES = [
+  {
+    id: "config1" as const,
+    label: "Configuration 1",
+    copy: "One air-cooled Dell PowerEdge XE9780 with eight B300 SXM GPUs. Posted prices are marked up 20%. Lines with no public price stay out of the total.",
+  },
+  {
+    id: "config2" as const,
+    label: "Giga G894",
+    copy: "The Giga Computing G894-SD3-AAX7 sheet: eight B300s, two Xeon 6776P, 32× 128 GB, eight 3.84 TB drives, and one BlueField-3 BF3220.",
+  },
   {
     id: "training" as const,
     label: "Training island",
@@ -31,6 +69,12 @@ const PROFILES = [
     copy: "GB200 NVL72. GPUs, NVLink, and tray cooling sit inside the rack price.",
   },
 ]
+
+function shownPrice(status: string | undefined, amount: number) {
+  if (status === "unpriced") return "Not posted"
+  if (status === "included") return "Included"
+  return money(amount)
+}
 
 function download(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2) + "\n"], { type: "application/json" })
@@ -49,7 +93,7 @@ async function copyText(value: string) {
 export function App() {
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [schema, setSchema] = useState<object | null>(null)
-  const [mission, setMission] = useState<Mission>(PRESETS.training as Mission)
+  const [mission, setMission] = useState<Mission>(PRESETS.config1 as Mission)
   const [overrides, setOverrides] = useState<Record<string, number>>({})
   const [quote, setQuote] = useState<Quote | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -103,6 +147,7 @@ export function App() {
   const accelerator = catalog.find((item) => item.id === mission.acceleratorId)
   const pcie = accelerator?.form === "pcie"
   const rackScale = mission.profile === "rack"
+  const fixed = mission.profile === "config1" || mission.profile === "config2"
   const manual = Object.keys(overrides).length > 0
   const groups = useMemo(() => {
     if (!quote) return []
@@ -215,7 +260,13 @@ export function App() {
             </div>
             <p className="hint">{profileCopy}</p>
 
-            {rackScale ? (
+            {fixed ? (
+              <ul className="spec">
+                {(mission.profile === "config1" ? CONFIG_1 : CONFIG_2).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            ) : rackScale ? (
               <Field label="NVL72 racks" hint="Each rack includes 72 GPUs.">
                 <input
                   type="number"
@@ -473,6 +524,7 @@ export function App() {
                 <thead>
                   <tr>
                     <th>Component</th>
+                    <th>Source</th>
                     <th className="num">Qty</th>
                     <th className="num">Spares</th>
                     <th className="num">Source each</th>
@@ -483,13 +535,23 @@ export function App() {
                 {groups.map((group) => (
                   <tbody key={group.id}>
                     <tr className="group">
-                      <th colSpan={6}>{group.label}</th>
+                      <th colSpan={7}>{group.label}</th>
                     </tr>
                     {group.lines.map((line) => (
                       <tr key={line.sku}>
                         <td>
                           <strong>{line.name}</strong>
                           <span>{line.spec}</span>
+                        </td>
+                        <td className="source">
+                          {line.source?.url ? (
+                            <a href={line.source.url} target="_blank" rel="noreferrer">
+                              {line.source.name}
+                            </a>
+                          ) : (
+                            <span>{line.source?.name || "Planning figure"}</span>
+                          )}
+                          {line.source ? <span>{line.source.note}</span> : <span>No distributor page checked.</span>}
                         </td>
                         <td className="num">
                           <input
@@ -505,9 +567,9 @@ export function App() {
                           />
                         </td>
                         <td className="num">{line.spareQty}</td>
-                        <td className="num">{money(line.sourceUnitPrice)}</td>
-                        <td className="num">{money(line.sourceLineTotal)}</td>
-                        <td className="num">{line.leadWeeks}w</td>
+                        <td className="num">{shownPrice(line.priceStatus, line.sourceUnitPrice)}</td>
+                        <td className="num">{shownPrice(line.priceStatus, line.sourceLineTotal)}</td>
+                        <td className="num">{line.leadWeeks ? `${line.leadWeeks}w` : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -607,7 +669,9 @@ export function App() {
                 <div>
                   <dt>Critical path</dt>
                   <dd>
-                    {quote.facility.leadWeeks}w · {quote.facility.criticalPath}
+                    {quote.facility.leadWeeks
+                      ? `${quote.facility.leadWeeks}w · ${quote.facility.criticalPath}`
+                      : "Not in the listings"}
                   </dd>
                 </div>
               </dl>
@@ -616,11 +680,19 @@ export function App() {
                   Fabric switches are more than a quarter of capex. Grow the node count before you buy a second one.
                 </p>
               ) : null}
-              <p className="note">
-                Racks follow the tighter of U-space and a {rackScale ? "120 kW NVL72" : "15 kW air / 80 kW liquid"}{" "}
-                budget. Spares are cold and stay out of the power sum. Energy is facility kW × hours × years × power
-                price.
-              </p>
+              {fixed ? (
+                <p className="note">
+                  IT load sums the published 1,100 W per GPU and 350 W per CPU. Memory, drives, and DPUs do not publish a
+                  TDP on these pages. Support is the midpoint of a published 6–9% yearly band, for three years, then
+                  marked up 20%. Lines marked not posted are outside the total.
+                </p>
+              ) : (
+                <p className="note">
+                  Racks follow the tighter of U-space and a {rackScale ? "120 kW NVL72" : "15 kW air / 80 kW liquid"}{" "}
+                  budget. Spares are cold and stay out of the power sum. Energy is facility kW × hours × years × power
+                  price.
+                </p>
+              )}
               {error ? <p className="error">{error}</p> : <p className="valid">Matches the sourcing quote schema.</p>}
               <div className="actions">
                 <button type="button" onClick={copyQuote}>

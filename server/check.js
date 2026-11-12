@@ -53,9 +53,35 @@ const rack = priceQuote({
 })
 assert(rack.facility.gpuCount === 288, `expected 288 GPUs in four NVL72 racks, got ${rack.facility.gpuCount}`)
 
+const config1 = priceQuote({
+  lines: buildBom(PRESETS.config1, catalog),
+  mission: PRESETS.config1,
+  catalog,
+})
+const board = config1.lines.find((line) => line.sku === "hgx-b300-nvl8")
+const dimms = config1.lines.find((line) => line.sku === "dimm-96-6400")
+const psus = config1.lines.find((line) => line.sku === "psu-3200")
+const chassis = config1.lines.find((line) => line.sku === "chassis-xe9780")
+assert(config1.facility.gpuCount === 8, "configuration 1 gpu count")
+assert(board?.qty === 1 && board.sourceUnitPrice === 545100, "B300 board source price")
+assert(board?.source?.url?.includes("gatewellusa.com"), "B300 source link")
+assert(dimms?.qty === 32, "32 memory modules")
+assert(psus?.qty === 12, "12 power supplies")
+assert(chassis?.priceStatus === "unpriced" && chassis.sourceUnitPrice === 0, "chassis stays unpriced")
+assert(!/\b454250\b|\b8400\b|\b4817\b|\b2789\b/.test(JSON.stringify(config1)), "posted price leaked into configuration 1")
+
+const config2 = priceQuote({
+  lines: buildBom(PRESETS.config2, catalog),
+  mission: PRESETS.config2,
+  catalog,
+})
+assert(config2.lines.find((line) => line.sku === "cpu-6776p")?.qty === 2, "Giga CPU quantity")
+assert(config2.lines.find((line) => line.sku === "pm9d3a-3.84")?.qty === 8, "Giga drive quantity")
+assert(config2.lines.find((line) => line.sku === "hgx-osfp")?.priceStatus === "included", "OSFP ports included")
+
 console.log(
   "ok",
   `training ${training.facility.racks} racks ${training.facility.itKw} kW`,
-  `inference check passed`,
+  `configuration 1 ${config1.totals.capexSource} source capex`,
   `rack-scale ${rack.facility.gpuCount} GPUs`,
 )

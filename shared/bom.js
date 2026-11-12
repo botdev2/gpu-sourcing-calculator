@@ -21,10 +21,45 @@ function planFabric(nicCount, ports) {
   return { leaves, spines, uplinks }
 }
 
+const FIXED = {
+  config1: [
+    ["hgx-b300-nvl8", 1],
+    ["chassis-xe9780", 1],
+    ["cpu-6767p", 2],
+    ["dimm-96-6400", 32],
+    ["boss-480", 2],
+    ["nvme-1.6", 1],
+    ["bf3-400", 2],
+    ["psu-3200", 12],
+    ["idrac10-dc", 1],
+    ["os-none", 1],
+    ["support-36-c1", 1],
+  ],
+  config2: [
+    ["hgx-b300-nvl8", 1],
+    ["chassis-g894", 1],
+    ["cpu-6776p", 2],
+    ["dimm-128-6400", 32],
+    ["m2-960", 2],
+    ["pm9d3a-3.84", 8],
+    ["hgx-osfp", 1],
+    ["bf3-3220", 1],
+    ["psu-3000", 12],
+    ["c19-cord", 12],
+    ["assembly-test", 1],
+    ["support-36-c2", 1],
+  ],
+}
+
 export function buildBom(mission, catalog) {
   const byId = Object.fromEntries(catalog.map((item) => [item.id, item]))
   const lines = []
-  const profile = mission.profile === "inference" || mission.profile === "rack" ? mission.profile : "training"
+  const profile = ["inference", "rack", "config1", "config2"].includes(mission.profile) ? mission.profile : "training"
+
+  if (FIXED[profile]) {
+    for (const [id, qty] of FIXED[profile]) add(lines, byId, id, qty)
+    return lines
+  }
 
   if (profile === "rack") {
     const racks = clampInt(mission.nodes, 1, 64)
