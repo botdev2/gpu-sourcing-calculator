@@ -1,4 +1,4 @@
-# Busbar
+# Stratum Infrastructure
 
 Planning desk for GPU and datacenter component sourcing.
 

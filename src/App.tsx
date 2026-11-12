@@ -215,7 +215,19 @@ export function App() {
     <>
       <header className="top">
         <div>
-          <h1>Busbar</h1>
+          <h1>
+            <span className="mark" aria-hidden="true">
+              <svg viewBox="0 0 32 32" width="16" height="16">
+                <rect x="4" y="6" width="24" height="3" rx="1.5" fill="#fff" />
+                <rect x="4" y="14.5" width="17" height="3" rx="1.5" fill="#fff" />
+                <rect x="4" y="23" width="10" height="3" rx="1.5" fill="#fff" />
+              </svg>
+            </span>
+            <span className="brand-name">
+              <span>Stratum</span>
+              <span>Infrastructure</span>
+            </span>
+          </h1>
           <p className="lede">GPU and datacenter component sourcing.</p>
         </div>
         <ul className="meta">
