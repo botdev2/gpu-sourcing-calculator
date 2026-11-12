@@ -1,0 +1,9 @@
+[variables]
+NIXPACKS_NODE_VERSION = "22"
+NPM_CONFIG_PRODUCTION = "false"
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "node server/index.js"
