@@ -1,4 +1,5 @@
 import { catalog } from "./catalog.js"
+import { normalizeIntake, publicOffer } from "./intake.js"
 import { PRESETS } from "../shared/mission.js"
 import { buildBom } from "../shared/bom.js"
 import { priceQuote, validateQuote } from "../shared/pricing.js"
@@ -78,6 +79,34 @@ const config2 = priceQuote({
 assert(config2.lines.find((line) => line.sku === "cpu-6776p")?.qty === 2, "Giga CPU quantity")
 assert(config2.lines.find((line) => line.sku === "pm9d3a-3.84")?.qty === 8, "Giga drive quantity")
 assert(config2.lines.find((line) => line.sku === "hgx-osfp")?.priceStatus === "included", "OSFP ports included")
+
+const offer = publicOffer(catalog)
+assert(offer.length === catalog.length, "offer drops products")
+assert(!JSON.stringify(offer).includes("sourcePrice"), "offer includes a price")
+assert(!offer.some((item) => "source" in item || "leadWeeks" in item), "offer includes sourcing detail")
+const rejected = normalizeIntake({ kind: "order", kyc: {}, order: [] }, catalog)
+assert(rejected.error, "empty template rejected")
+const accepted = normalizeIntake(
+  {
+    kind: "order",
+    kyc: {
+      company: "North Mill",
+      registry: "12345678",
+      country: "Estonia",
+      address: "Tallinn 1",
+      contact: "Ada Saar",
+      email: "ada@example.com",
+      role: "Buyer",
+      phone: "+372 5551 234",
+      use: "Training cluster",
+    },
+    order: [{ id: "gpu-b200", qty: 8 }],
+    tokens: { amount: "20 million", period: "month", use: "Inference" },
+  },
+  catalog,
+)
+assert(accepted.record?.order[0].qty === 8, "order line kept")
+assert(!JSON.stringify(accepted.record).includes("sourcePrice"), "intake stores a price")
 
 console.log(
   "ok",

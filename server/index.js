@@ -4,6 +4,7 @@ import path from "node:path"
 import { catalog } from "./catalog.js"
 import { quoteSchema } from "../shared/schema.js"
 import { priceQuote, validateQuote } from "../shared/pricing.js"
+import { accessAllowed, grantAccess, normalizeIntake, publicOffer, saveIntake } from "./intake.js"
 
 const port = Number(process.env.PORT) || 3000
 const dist = path.resolve("dist")
@@ -50,6 +51,22 @@ function staticFile(urlPath) {
   return full
 }
 
+const hits = new Map()
+
+function limited(req) {
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "local").split(",")[0].trim()
+  const now = Date.now()
+  const recent = (hits.get(ip) || []).filter((at) => now - at < 10 * 60 * 1000)
+  if (recent.length >= 20) return true
+  recent.push(now)
+  hits.set(ip, recent)
+  return false
+}
+
+function allowed(req) {
+  return accessAllowed(String(req.headers["x-stratum-access"] || ""))
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", "http://localhost")
   try {
@@ -57,7 +74,15 @@ const server = http.createServer(async (req, res) => {
       send(res, 200, { ok: true })
       return
     }
+    if (req.method === "GET" && url.pathname === "/api/offer") {
+      send(res, 200, { items: publicOffer(catalog) })
+      return
+    }
     if (req.method === "GET" && url.pathname === "/api/catalog") {
+      if (!allowed(req)) {
+        send(res, 401, { error: "The calculator opens after the template." })
+        return
+      }
       send(res, 200, { items: catalog })
       return
     }
@@ -65,7 +90,34 @@ const server = http.createServer(async (req, res) => {
       send(res, 200, quoteSchema)
       return
     }
+    if (req.method === "POST" && url.pathname === "/api/intake") {
+      if (limited(req)) {
+        send(res, 429, { error: "Too many submissions. Wait a few minutes." })
+        return
+      }
+      const raw = await readBody(req)
+      let payload
+      try {
+        payload = JSON.parse(raw || "{}")
+      } catch {
+        send(res, 400, { error: "The form must be JSON." })
+        return
+      }
+      const result = normalizeIntake(payload, catalog)
+      if (result.error) {
+        send(res, 400, { error: result.error })
+        return
+      }
+      saveIntake(result.record)
+      if (result.record.kind === "order") send(res, 200, { ok: true, access: grantAccess() })
+      else send(res, 200, { ok: true })
+      return
+    }
     if (req.method === "POST" && url.pathname === "/api/quote") {
+      if (!allowed(req)) {
+        send(res, 401, { error: "The calculator opens after the template." })
+        return
+      }
       const raw = await readBody(req)
       let payload
       try {

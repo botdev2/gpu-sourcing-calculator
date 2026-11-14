@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { applyOverrides, buildBom } from "../shared/bom.js"
 import { PRESETS } from "../shared/mission.js"
 import { hourly, kw, money } from "./format"
+import type { Draft } from "./draft"
 import type { CatalogItem, Mission, Quote } from "./types"
 
 const GROUPS: { id: Quote["lines"][number]["category"]; label: string }[] = [
@@ -90,7 +91,15 @@ async function copyText(value: string) {
   await navigator.clipboard.writeText(value)
 }
 
-export function App() {
+export function App({
+  access = "",
+  draft = null,
+  onFront,
+}: {
+  access?: string
+  draft?: Draft | null
+  onFront?: () => void
+}) {
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [schema, setSchema] = useState<object | null>(null)
   const [mission, setMission] = useState<Mission>(PRESETS.config1 as Mission)
@@ -104,11 +113,18 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([fetch("/api/catalog").then((res) => res.json()), fetch("/api/schema").then((res) => res.json())])
+    Promise.all([
+      fetch("/api/catalog", { headers: { "x-stratum-access": access } }).then(async (res) => ({ ok: res.ok, body: await res.json() })),
+      fetch("/api/schema").then((res) => res.json()),
+    ])
       .then(([catalogBody, schemaBody]) => {
         if (cancelled) return
-        setCatalog(catalogBody.items)
         setSchema(schemaBody)
+        if (!catalogBody.ok) {
+          setError("The calculator is closed.")
+          return
+        }
+        setCatalog(catalogBody.body.items || [])
       })
       .catch(() => {
         if (!cancelled) setError("The catalog did not load.")
@@ -116,7 +132,7 @@ export function App() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [access])
 
   useEffect(() => {
     if (!catalog.length) return
@@ -126,7 +142,7 @@ export function App() {
         const lines = applyOverrides(buildBom(mission, catalog), overrides)
         const res = await fetch("/api/quote", {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "x-stratum-access": access },
           body: JSON.stringify({ lines, mission }),
         })
         const body = await res.json()
@@ -142,7 +158,7 @@ export function App() {
       }
     }, 80)
     return () => clearTimeout(timer)
-  }, [catalog, mission, overrides])
+  }, [access, catalog, mission, overrides])
 
   const accelerator = catalog.find((item) => item.id === mission.acceleratorId)
   const pcie = accelerator?.form === "pcie"
@@ -230,10 +246,27 @@ export function App() {
           </h1>
           <p className="lede">GPU and datacenter component sourcing.</p>
         </div>
-        <ul className="meta">
-          <li>Nov 2026</li>
-        </ul>
+        <div className="meta-row">
+          <ul className="meta">
+            <li>Estonia</li>
+          </ul>
+          {onFront ? (
+            <button type="button" className="ghost" onClick={onFront}>
+              Guide
+            </button>
+          ) : null}
+        </div>
       </header>
+
+      {draft && (draft.lines.length > 0 || draft.tokens?.amount) ? (
+        <aside className="draft-bar">
+          <strong>Order</strong>
+          <span>
+            {draft.lines.map((line) => `${line.qty}× ${line.name}`).join(" · ")}
+            {draft.tokens?.amount ? `${draft.lines.length ? " · " : ""}Tokens ${draft.tokens.amount} / ${draft.tokens.period}` : ""}
+          </span>
+        </aside>
+      ) : null}
 
       <main className="desk">
         <section className="panel mission">
@@ -813,8 +846,7 @@ export function App() {
 
       <footer>
         <p>
-          November 2026 planning basis. Not a live distributor feed. Confirm every source price before you issue a
-          purchase order.
+          Stratum Infrastructure · Estonia. Confirm every figure before you issue a purchase order.
         </p>
       </footer>
     </>
