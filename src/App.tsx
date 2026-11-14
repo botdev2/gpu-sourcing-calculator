@@ -252,7 +252,7 @@ export function App({
           </ul>
           {onFront ? (
             <button type="button" className="ghost" onClick={onFront}>
-              Guide
+              Orders
             </button>
           ) : null}
         </div>

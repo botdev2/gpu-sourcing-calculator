@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import type { Draft, TokenAsk } from "./draft"
 
 type OfferItem = {
@@ -10,30 +10,7 @@ type OfferItem = {
   unit: string
 }
 
-type Role = "guide" | "you"
-
-type Msg = { id: number; role: Role; text: string }
-
-type Step =
-  | "choose"
-  | "cover"
-  | "token-amount"
-  | "token-period"
-  | "token-use"
-  | "gear"
-  | "kyc"
-  | "dc-where"
-  | "dc-site"
-  | "dc-power"
-  | "dc-utility"
-  | "dc-permits"
-  | "dc-cooling"
-  | "dc-workload"
-  | "dc-scale"
-  | "dc-network"
-  | "dc-when"
-  | "dc-who"
-  | "dc-done"
+type Screen = "home" | "order" | "kyc" | "site" | "sent"
 
 const GROUPS = [
   { id: "accelerator", label: "Accelerators" },
@@ -64,6 +41,21 @@ const emptyKyc = {
   use: "",
 }
 
+const emptySite = {
+  where: "",
+  site: "searching",
+  power: "",
+  utility: "none",
+  permits: "none",
+  cooling: "undecided",
+  workload: "mixed",
+  scale: "",
+  network: "internet",
+  when: "",
+  contact: "",
+  email: "",
+}
+
 export function Front({
   draft,
   onDraft,
@@ -79,35 +71,11 @@ export function Front({
 }) {
   const [items, setItems] = useState<OfferItem[]>([])
   const [group, setGroup] = useState("accelerator")
-  const [open, setOpen] = useState(false)
-  const [step, setStep] = useState<Step>("choose")
-  const [messages, setMessages] = useState<Msg[]>([
-    {
-      id: 1,
-      role: "guide",
-      text: "Stratum Infrastructure, Estonia. I can prepare a hardware order, take a token volume, or walk a data-center plan from the site outward. Where should we start?",
-    },
-  ])
-  const [text, setText] = useState("")
+  const [screen, setScreen] = useState<Screen>("home")
   const [kyc, setKyc] = useState(emptyKyc)
-  const [who, setWho] = useState({ contact: "", email: "" })
-  const [site, setSite] = useState({
-    where: "",
-    site: "",
-    power: "",
-    utility: "",
-    permits: "",
-    cooling: "",
-    workload: "",
-    scale: "",
-    network: "",
-    when: "",
-  })
-  const [afterTokens, setAfterTokens] = useState(false)
+  const [site, setSite] = useState(emptySite)
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState("")
-  const seq = useRef(1)
-  const end = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetch("/api/offer")
@@ -116,108 +84,32 @@ export function Front({
       .catch(() => setItems([]))
   }, [])
 
-  useEffect(() => {
-    end.current?.scrollIntoView({ block: "end" })
-  }, [messages, step, open])
-
-  function say(role: Role, line: string) {
-    setMessages((current) => [...current, { id: ++seq.current, role, text: line }])
-  }
-
-  function begin(path: "order" | "brief") {
-    setOpen(true)
-    if (step !== "choose") return
-    if (path === "order") {
-      say("you", "Source hardware")
-      say("guide", "What should we put on the order?")
-      setStep("cover")
-      return
-    }
-    say("you", "Plan a data center")
-    say("guide", "This path starts from the site. Where is it, or where should it be?")
-    setStep("dc-where")
-  }
-
-  function cover(choice: string) {
-    say("you", choice)
-    const tokens = choice === "Inference tokens" || choice === "All of it"
-    if (choice === "Fabric and power") setGroup("network")
-    if (choice === "GPUs and servers") setGroup("accelerator")
-    if (!tokens) {
-      say("guide", "Add the pieces from the list. Tell me when the order is ready.")
-      setStep("gear")
-      return
-    }
-    setAfterTokens(choice === "All of it")
-    if (draft.tokens?.amount) {
-      say(
-        "guide",
-        `${draft.tokens.amount} per ${draft.tokens.period} is on the order. We source that volume from the market at a discount. Add hardware, or continue to the template.`,
-      )
-      setStep("gear")
-      return
-    }
-    say("guide", "How many tokens do you need?")
-    setStep("token-amount")
-  }
-
-  function tokenAmount(amount: string) {
-    const clean = amount.trim()
-    if (!clean) return
-    onDraft({ ...draft, tokens: { amount: clean, period: draft.tokens?.period || "month", use: draft.tokens?.use || "" } })
-    say("you", clean)
-    say("guide", "Over what period?")
-    setText("")
-    setStep("token-period")
-  }
-
-  function tokenPeriod(period: TokenAsk["period"], label: string) {
-    onDraft({
-      ...draft,
-      tokens: { amount: draft.tokens?.amount || text.trim(), period, use: draft.tokens?.use || "" },
-    })
-    say("you", label)
-    say("guide", "What are they for?")
-    setStep("token-use")
-  }
-
-  function tokenUse(use: string) {
-    const tokens = {
-      amount: draft.tokens?.amount || "",
-      period: draft.tokens?.period || "month",
-      use: use.trim(),
-    }
-    onDraft({ ...draft, tokens })
-    say("you", use.trim() || "General pool")
-    say(
-      "guide",
-      `${tokens.amount} per ${tokens.period} is on the order. We source that volume from the market at a discount.${afterTokens ? " Add the hardware from the list, then continue." : " Continue when you want the template."}`,
-    )
-    setText("")
-    setStep("gear")
-  }
-
-  function ready(onlyTokens: boolean) {
-    say("you", onlyTokens ? "I only need tokens" : "The order is ready")
-    if (onlyTokens && !draft.tokens?.amount) {
-      say("guide", "How many tokens do you need?")
-      setStep("token-amount")
-      return
-    }
-    if (!onlyTokens && !draft.lines.length && !draft.tokens?.amount) {
-      say("guide", "The order is still empty. Add a product, or give me the token volume.")
-      return
-    }
-    say("guide", "The calculator stays closed until this template is in.")
-    setStep("kyc")
-  }
-
   function setQty(item: OfferItem, qty: number) {
     const next = Math.max(0, qty)
     const lines = draft.lines.filter((line) => line.id !== item.id)
     if (next > 0) lines.push({ id: item.id, name: item.name, qty: next })
     onDraft({ ...draft, lines })
   }
+
+  function setTokens(patch: Partial<TokenAsk> | null) {
+    if (!patch) {
+      onDraft({ ...draft, tokens: null })
+      return
+    }
+    onDraft({
+      ...draft,
+      tokens: {
+        amount: draft.tokens?.amount || "",
+        period: draft.tokens?.period || "month",
+        use: draft.tokens?.use || "",
+        ...patch,
+      },
+    })
+  }
+
+  const ready = draft.lines.length > 0 || Boolean(draft.tokens?.amount?.trim())
+  const shown = items.filter((item) => item.category === group)
+  const qtyOf = (id: string) => draft.lines.find((line) => line.id === id)?.qty || 0
 
   async function submitOrder() {
     setBusy(true)
@@ -230,33 +122,15 @@ export function Front({
       })
       const body = await res.json()
       if (!res.ok) {
-        setFormError(body.error || "The template did not go through.")
+        setFormError(body.error || "The form did not go through.")
         return
       }
-      say("guide", "Template received. The calculator is open.")
       onUnlocked(body.access)
     } catch {
-      setFormError("The template did not go through.")
+      setFormError("The form did not go through.")
     } finally {
       setBusy(false)
     }
-  }
-
-  function dcChoice(field: keyof typeof site, value: string, label: string, next: Step, prompt: string) {
-    setSite((current) => ({ ...current, [field]: value }))
-    say("you", label)
-    say("guide", prompt)
-    setStep(next)
-  }
-
-  function dcText(field: "where" | "power" | "scale" | "when", next: Step, prompt: string) {
-    const value = text.trim()
-    if (value.length < 2) return
-    setSite((current) => ({ ...current, [field]: value }))
-    say("you", value)
-    say("guide", prompt)
-    setText("")
-    setStep(next)
   }
 
   async function submitBrief() {
@@ -266,24 +140,20 @@ export function Front({
       const res = await fetch("/api/intake", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "brief", site: { ...site, ...who } }),
+        body: JSON.stringify({ kind: "brief", site }),
       })
       const body = await res.json()
       if (!res.ok) {
         setFormError(body.error || "The brief did not go through.")
         return
       }
-      say("guide", "Brief received. Hardware pricing still waits on the KYC template, if you want it.")
-      setStep("dc-done")
+      setScreen("sent")
     } catch {
       setFormError("The brief did not go through.")
     } finally {
       setBusy(false)
     }
   }
-
-  const shown = items.filter((item) => item.category === group)
-  const qtyOf = (id: string) => draft.lines.find((line) => line.id === id)?.qty || 0
 
   return (
     <>
@@ -302,137 +172,317 @@ export function Front({
               <span>Infrastructure</span>
             </span>
           </h1>
-          <p className="lede">Estonia. Hardware, tokens, and data-center plans.</p>
+          <p className="lede">Estonia. The calculator opens after client verification.</p>
         </div>
-        {access ? (
-          <button type="button" className="ghost" onClick={onDesk}>
-            Calculator
-          </button>
-        ) : null}
+        <div className="meta-row">
+          {screen !== "home" ? (
+            <button type="button" className="ghost" onClick={() => setScreen("home")}>
+              Back
+            </button>
+          ) : null}
+          {access ? (
+            <button type="button" className="ghost" onClick={onDesk}>
+              Calculator
+            </button>
+          ) : null}
+        </div>
       </header>
 
       <main className="front">
-        <section className="paths">
-          <button type="button" className="path" onClick={() => begin("order")}>
-            <strong>Source hardware</strong>
-            <span>Choose the gear, add a token volume, and prepare the order.</span>
-          </button>
-          <button type="button" className="path" onClick={() => begin("brief")}>
-            <strong>Plan a data center</strong>
-            <span>Site, power, permits, cooling, and the workload.</span>
-          </button>
-        </section>
+        {screen === "home" ? (
+          <section className="paths">
+            <button type="button" className="path" onClick={() => setScreen("order")}>
+              <strong>Source hardware</strong>
+              <span>Build the order, then complete verification.</span>
+            </button>
+            <button type="button" className="path" onClick={() => setScreen("site")}>
+              <strong>Plan a data center</strong>
+              <span>Site, power, permits, cooling, and the workload.</span>
+            </button>
+          </section>
+        ) : null}
 
-        <section className="panel offer">
-          <h2>Hardware</h2>
-          <div className="panel-body">
-            <div className="seg" role="group" aria-label="Hardware group">
-              {GROUPS.map((entry) => (
-                <button key={entry.id} type="button" aria-pressed={group === entry.id} onClick={() => setGroup(entry.id)}>
-                  {entry.label}
-                </button>
-              ))}
-            </div>
-            <ul className="offer-list">
-              {shown.map((item) => {
-                const qty = qtyOf(item.id)
-                return (
-                  <li key={item.id}>
-                    <div>
-                      <strong>{item.name}</strong>
-                      <span>{item.spec}</span>
-                    </div>
-                    <div className="qty">
-                      <button type="button" className="ghost" onClick={() => setQty(item, qty - 1)} aria-label={`Remove one ${item.name}`}>
-                        −
-                      </button>
-                      <span>{qty ? `${qty} ${item.unit}` : item.unit}</span>
-                      <button type="button" className="ghost" onClick={() => setQty(item, qty + 1)} aria-label={`Add one ${item.name}`}>
-                        +
-                      </button>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        </section>
-
-        <section className="panel">
-          <h2>Tokens</h2>
-          <div className="panel-body">
-            <p className="hint">Tell us the volume. Stratum sources tokens from the market at a discount.</p>
-            <div className="split">
-              <label className="field">
-                <span>How many</span>
-                <input
-                  value={draft.tokens?.amount || ""}
-                  placeholder="20 million"
-                  onChange={(event) => {
-                    const amount = event.target.value
-                    if (!amount.trim()) onDraft({ ...draft, tokens: null })
-                    else
-                      onDraft({
-                        ...draft,
-                        tokens: { amount, period: draft.tokens?.period || "month", use: draft.tokens?.use || "" },
-                      })
-                  }}
-                />
-              </label>
-              <label className="field">
-                <span>Period</span>
-                <select
-                  value={draft.tokens?.period || "month"}
-                  onChange={(event) => {
-                    const period = event.target.value as TokenAsk["period"]
-                    if (!draft.tokens?.amount) return
-                    onDraft({ ...draft, tokens: { ...draft.tokens, period } })
-                  }}
-                >
-                  {PERIODS.map((period) => (
-                    <option key={period.id} value={period.id}>
-                      {period.label}
-                    </option>
+        {screen === "order" ? (
+          <>
+            <section className="panel offer">
+              <h2>Hardware</h2>
+              <div className="panel-body">
+                <div className="seg" role="group" aria-label="Hardware group">
+                  {GROUPS.map((entry) => (
+                    <button key={entry.id} type="button" aria-pressed={group === entry.id} onClick={() => setGroup(entry.id)}>
+                      {entry.label}
+                    </button>
                   ))}
-                </select>
-              </label>
-            </div>
-            <label className="field">
-              <span>What they are for</span>
-              <input
-                value={draft.tokens?.use || ""}
-                placeholder="Inference, a named model, or a general pool"
-                onChange={(event) => {
-                  if (!draft.tokens?.amount) return
-                  onDraft({ ...draft, tokens: { ...draft.tokens, use: event.target.value } })
-                }}
-              />
-            </label>
-          </div>
-        </section>
+                </div>
+                <ul className="offer-list">
+                  {shown.map((item) => {
+                    const qty = qtyOf(item.id)
+                    return (
+                      <li key={item.id}>
+                        <div>
+                          <strong>{item.name}</strong>
+                          <span>{item.spec}</span>
+                        </div>
+                        <div className="qty">
+                          <button type="button" className="ghost" onClick={() => setQty(item, qty - 1)} aria-label={`Remove one ${item.name}`}>
+                            −
+                          </button>
+                          <span>{qty ? `${qty} ${item.unit}` : item.unit}</span>
+                          <button type="button" className="ghost" onClick={() => setQty(item, qty + 1)} aria-label={`Add one ${item.name}`}>
+                            +
+                          </button>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            </section>
 
-        {draft.lines.length || draft.tokens?.amount ? (
+            <section className="panel">
+              <h2>Tokens</h2>
+              <div className="panel-body">
+                <p className="hint">Optional. Stratum sources the volume from the market at a discount.</p>
+                <div className="split">
+                  <label className="field">
+                    <span>How many</span>
+                    <input
+                      value={draft.tokens?.amount || ""}
+                      placeholder="20 million"
+                      onChange={(event) => {
+                        const amount = event.target.value
+                        if (!amount.trim()) setTokens(null)
+                        else setTokens({ amount })
+                      }}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Period</span>
+                    <select
+                      value={draft.tokens?.period || "month"}
+                      onChange={(event) => {
+                        if (!draft.tokens?.amount?.trim()) return
+                        setTokens({ period: event.target.value as TokenAsk["period"] })
+                      }}
+                    >
+                      {PERIODS.map((period) => (
+                        <option key={period.id} value={period.id}>
+                          {period.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label className="field">
+                  <span>What they are for</span>
+                  <input
+                    value={draft.tokens?.use || ""}
+                    onChange={(event) => {
+                      if (!draft.tokens?.amount) return
+                      setTokens({ use: event.target.value })
+                    }}
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section className="panel">
+              <h2>Order</h2>
+              <div className="panel-body">
+                {ready ? (
+                  <ul className="order-list">
+                    {draft.lines.map((line) => (
+                      <li key={line.id}>
+                        <span>{line.name}</span>
+                        <strong>{line.qty}</strong>
+                      </li>
+                    ))}
+                    {draft.tokens?.amount ? (
+                      <li>
+                        <span>
+                          Tokens · {draft.tokens.amount} / {draft.tokens.period}
+                        </span>
+                        <strong>{draft.tokens.use || "Open"}</strong>
+                      </li>
+                    ) : null}
+                  </ul>
+                ) : (
+                  <p className="hint">Add hardware or a token volume.</p>
+                )}
+                <button type="button" disabled={!ready} onClick={() => setScreen("kyc")}>
+                  Continue to verification
+                </button>
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        {screen === "kyc" ? (
           <section className="panel">
-            <h2>Order</h2>
-            <div className="panel-body">
-              <ul className="order-list">
-                {draft.lines.map((line) => (
-                  <li key={line.id}>
-                    <span>{line.name}</span>
-                    <strong>{line.qty}</strong>
-                  </li>
+            <h2>Client verification</h2>
+            <form
+              className="panel-body"
+              onSubmit={(event) => {
+                event.preventDefault()
+                submitOrder()
+              }}
+            >
+              <p className="hint">The calculator opens when this form is submitted.</p>
+              <div className="kyc-grid">
+                {(
+                  [
+                    ["company", "Legal name", "text"],
+                    ["registry", "Registry code", "text"],
+                    ["country", "Country", "text"],
+                    ["contact", "Contact name", "text"],
+                    ["email", "Work email", "email"],
+                    ["role", "Role", "text"],
+                    ["phone", "Phone", "tel"],
+                  ] as const
+                ).map(([key, label, type]) => (
+                  <label key={key} className="field">
+                    <span>{label}</span>
+                    <input
+                      required
+                      type={type}
+                      autoComplete={key === "email" ? "email" : "on"}
+                      value={kyc[key]}
+                      onChange={(event) => setKyc((current) => ({ ...current, [key]: event.target.value }))}
+                    />
+                  </label>
                 ))}
-                {draft.tokens?.amount ? (
-                  <li>
-                    <span>
-                      Tokens · {draft.tokens.amount} / {draft.tokens.period}
-                    </span>
-                    <strong>{draft.tokens.use || "Open"}</strong>
-                  </li>
-                ) : null}
-              </ul>
-              <button type="button" onClick={() => begin("order")}>
-                Continue in the guide
+                <label className="field wide">
+                  <span>Address</span>
+                  <input
+                    required
+                    value={kyc.address}
+                    onChange={(event) => setKyc((current) => ({ ...current, address: event.target.value }))}
+                  />
+                </label>
+                <label className="field wide">
+                  <span>Intended use</span>
+                  <input
+                    required
+                    value={kyc.use}
+                    onChange={(event) => setKyc((current) => ({ ...current, use: event.target.value }))}
+                  />
+                </label>
+              </div>
+              {formError ? <p className="error">{formError}</p> : null}
+              <div className="actions">
+                <button type="button" className="ghost" onClick={() => setScreen("order")}>
+                  Back to the order
+                </button>
+                <button type="submit" disabled={busy || !ready}>
+                  {busy ? "Sending" : "Submit and open calculator"}
+                </button>
+              </div>
+            </form>
+          </section>
+        ) : null}
+
+        {screen === "site" ? (
+          <section className="panel">
+            <h2>Data center</h2>
+            <form
+              className="panel-body"
+              onSubmit={(event) => {
+                event.preventDefault()
+                submitBrief()
+              }}
+            >
+              <div className="kyc-grid">
+                <label className="field wide">
+                  <span>Location</span>
+                  <input required value={site.where} placeholder="Country and city" onChange={(event) => setSite({ ...site, where: event.target.value })} />
+                </label>
+                <label className="field">
+                  <span>Site</span>
+                  <select value={site.site} onChange={(event) => setSite({ ...site, site: event.target.value })}>
+                    <option value="owned">Owned</option>
+                    <option value="leased">Leased</option>
+                    <option value="searching">Still looking</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Power</span>
+                  <input required value={site.power} placeholder="4 MW now, 20 MW target" onChange={(event) => setSite({ ...site, power: event.target.value })} />
+                </label>
+                <label className="field">
+                  <span>Utility</span>
+                  <select value={site.utility} onChange={(event) => setSite({ ...site, utility: event.target.value })}>
+                    <option value="connected">Connected</option>
+                    <option value="filed">Application filed</option>
+                    <option value="none">Not started</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Permits</span>
+                  <select value={site.permits} onChange={(event) => setSite({ ...site, permits: event.target.value })}>
+                    <option value="none">None yet</option>
+                    <option value="progress">In progress</option>
+                    <option value="granted">Granted</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Cooling</span>
+                  <select value={site.cooling} onChange={(event) => setSite({ ...site, cooling: event.target.value })}>
+                    <option value="air">Air</option>
+                    <option value="liquid">Liquid</option>
+                    <option value="undecided">Not decided</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Workload</span>
+                  <select value={site.workload} onChange={(event) => setSite({ ...site, workload: event.target.value })}>
+                    <option value="training">Training</option>
+                    <option value="inference">Inference</option>
+                    <option value="mixed">Mixed</option>
+                    <option value="colo">Capacity for others</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Scale</span>
+                  <input required value={site.scale} placeholder="1,000 GPUs or 8 MW IT" onChange={(event) => setSite({ ...site, scale: event.target.value })} />
+                </label>
+                <label className="field">
+                  <span>Connectivity</span>
+                  <select value={site.network} onChange={(event) => setSite({ ...site, network: event.target.value })}>
+                    <option value="internet">Internet</option>
+                    <option value="fiber">Private fiber</option>
+                    <option value="infiniband">InfiniBand on site</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>First capacity</span>
+                  <input required value={site.when} placeholder="This year" onChange={(event) => setSite({ ...site, when: event.target.value })} />
+                </label>
+                <label className="field">
+                  <span>Name</span>
+                  <input required value={site.contact} onChange={(event) => setSite({ ...site, contact: event.target.value })} />
+                </label>
+                <label className="field">
+                  <span>Email</span>
+                  <input required type="email" value={site.email} onChange={(event) => setSite({ ...site, email: event.target.value })} />
+                </label>
+              </div>
+              {formError ? <p className="error">{formError}</p> : null}
+              <div className="actions">
+                <button type="submit" disabled={busy}>
+                  {busy ? "Sending" : "Send brief"}
+                </button>
+              </div>
+            </form>
+          </section>
+        ) : null}
+
+        {screen === "sent" ? (
+          <section className="panel">
+            <h2>Brief received</h2>
+            <div className="panel-body">
+              <p className="hint">Hardware pricing still goes through verification.</p>
+              <button type="button" onClick={() => setScreen("order")}>
+                Prepare a hardware order
               </button>
             </div>
           </section>
@@ -442,318 +492,6 @@ export function Front({
       <footer>
         <p>Stratum Infrastructure · Estonia. Confirm the order before you commit to it.</p>
       </footer>
-
-      {open ? (
-        <section className="chat" aria-label="Guide">
-          <header>
-            <strong>Guide</strong>
-            <button type="button" className="ghost" onClick={() => setOpen(false)}>
-              Close
-            </button>
-          </header>
-          <div className="thread">
-            {messages.map((message) => (
-              <p key={message.id} className={message.role}>
-                {message.text}
-              </p>
-            ))}
-            <div ref={end} />
-          </div>
-          <div className="composer">
-            {step === "choose" ? (
-              <div className="replies">
-                <button type="button" className="ghost" onClick={() => begin("order")}>
-                  Source hardware
-                </button>
-                <button type="button" className="ghost" onClick={() => begin("brief")}>
-                  Plan a data center
-                </button>
-              </div>
-            ) : null}
-            {step === "cover" ? (
-              <div className="replies">
-                {["GPUs and servers", "Fabric and power", "Inference tokens", "All of it"].map((choice) => (
-                  <button key={choice} type="button" className="ghost" onClick={() => cover(choice)}>
-                    {choice}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {step === "token-amount" ? (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  tokenAmount(text)
-                }}
-              >
-                <input value={text} onChange={(event) => setText(event.target.value)} placeholder="How many" aria-label="Token volume" />
-                <button type="submit">Continue</button>
-              </form>
-            ) : null}
-            {step === "token-period" ? (
-              <div className="replies">
-                {PERIODS.map((period) => (
-                  <button key={period.id} type="button" className="ghost" onClick={() => tokenPeriod(period.id, period.label)}>
-                    {period.label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {step === "token-use" ? (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  tokenUse(text)
-                }}
-              >
-                <input value={text} onChange={(event) => setText(event.target.value)} placeholder="Inference, a model, a pool" aria-label="Token use" />
-                <button type="submit">Continue</button>
-              </form>
-            ) : null}
-            {step === "gear" ? (
-              <div className="replies">
-                <button type="button" className="ghost" onClick={() => ready(false)}>
-                  The order is ready
-                </button>
-                <button type="button" className="ghost" onClick={() => ready(true)}>
-                  I only need tokens
-                </button>
-              </div>
-            ) : null}
-            {step === "kyc" ? (
-              <form
-                className="kyc"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  submitOrder()
-                }}
-              >
-                {(
-                  [
-                    ["company", "Legal name"],
-                    ["registry", "Registry code"],
-                    ["country", "Country"],
-                    ["address", "Address"],
-                    ["contact", "Contact name"],
-                    ["email", "Work email"],
-                    ["role", "Role"],
-                    ["phone", "Phone"],
-                    ["use", "What the order is for"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <label key={key} className="field">
-                    <span>{label}</span>
-                    <input
-                      required
-                      type={key === "email" ? "email" : "text"}
-                      value={kyc[key]}
-                      onChange={(event) => setKyc((current) => ({ ...current, [key]: event.target.value }))}
-                    />
-                  </label>
-                ))}
-                {formError ? <p className="error">{formError}</p> : null}
-                <button type="submit" disabled={busy}>
-                  {busy ? "Sending" : "Submit template"}
-                </button>
-              </form>
-            ) : null}
-            {step === "dc-where" ? (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  dcText("where", "dc-site", "Do you have the site?")
-                }}
-              >
-                <input value={text} onChange={(event) => setText(event.target.value)} placeholder="Country and city" aria-label="Location" />
-                <button type="submit">Continue</button>
-              </form>
-            ) : null}
-            {step === "dc-site" ? (
-              <div className="replies">
-                {[
-                  ["owned", "Owned"],
-                  ["leased", "Leased"],
-                  ["searching", "Still looking"],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className="ghost"
-                    onClick={() => dcChoice("site", value, label, "dc-power", "How much power is available now, and how much do you need?")}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {step === "dc-power" ? (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  dcText("power", "dc-utility", "Where is the utility connection?")
-                }}
-              >
-                <input value={text} onChange={(event) => setText(event.target.value)} placeholder="4 MW now, 20 MW target" aria-label="Power" />
-                <button type="submit">Continue</button>
-              </form>
-            ) : null}
-            {step === "dc-utility" ? (
-              <div className="replies">
-                {[
-                  ["connected", "Connected"],
-                  ["filed", "Application filed"],
-                  ["none", "Not started"],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className="ghost"
-                    onClick={() => dcChoice("utility", value, label, "dc-permits", "Which permits are in hand?")}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {step === "dc-permits" ? (
-              <div className="replies">
-                {[
-                  ["none", "None yet"],
-                  ["progress", "In progress"],
-                  ["granted", "Granted"],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className="ghost"
-                    onClick={() => dcChoice("permits", value, label, "dc-cooling", "How do you want to cool it?")}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {step === "dc-cooling" ? (
-              <div className="replies">
-                {[
-                  ["air", "Air"],
-                  ["liquid", "Liquid"],
-                  ["undecided", "Not decided"],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className="ghost"
-                    onClick={() => dcChoice("cooling", value, label, "dc-workload", "What will the hall run?")}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {step === "dc-workload" ? (
-              <div className="replies">
-                {[
-                  ["training", "Training"],
-                  ["inference", "Inference"],
-                  ["mixed", "Mixed"],
-                  ["colo", "Capacity for others"],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className="ghost"
-                    onClick={() => dcChoice("workload", value, label, "dc-scale", "What scale are you planning?")}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {step === "dc-scale" ? (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  dcText("scale", "dc-network", "What connectivity do you need?")
-                }}
-              >
-                <input value={text} onChange={(event) => setText(event.target.value)} placeholder="1,000 GPUs or 8 MW IT" aria-label="Scale" />
-                <button type="submit">Continue</button>
-              </form>
-            ) : null}
-            {step === "dc-network" ? (
-              <div className="replies">
-                {[
-                  ["internet", "Internet"],
-                  ["fiber", "Private fiber"],
-                  ["infiniband", "InfiniBand on site"],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className="ghost"
-                    onClick={() => dcChoice("network", value, label, "dc-when", "When do you need the first capacity?")}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {step === "dc-when" ? (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  dcText("when", "dc-who", "Who should we write back to?")
-                }}
-              >
-                <input value={text} onChange={(event) => setText(event.target.value)} placeholder="This year, next summer" aria-label="Timing" />
-                <button type="submit">Continue</button>
-              </form>
-            ) : null}
-            {step === "dc-who" ? (
-              <form
-                className="kyc"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  submitBrief()
-                }}
-              >
-                <label className="field">
-                  <span>Name</span>
-                  <input required value={who.contact} onChange={(event) => setWho((current) => ({ ...current, contact: event.target.value }))} />
-                </label>
-                <label className="field">
-                  <span>Email</span>
-                  <input required type="email" value={who.email} onChange={(event) => setWho((current) => ({ ...current, email: event.target.value }))} />
-                </label>
-                {formError ? <p className="error">{formError}</p> : null}
-                <button type="submit" disabled={busy}>
-                  {busy ? "Sending" : "Send brief"}
-                </button>
-              </form>
-            ) : null}
-            {step === "dc-done" ? (
-              <div className="replies">
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => {
-                    say("you", "Prepare a hardware order")
-                    say("guide", "What should we put on the order?")
-                    setStep("cover")
-                  }}
-                >
-                  Prepare a hardware order
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </section>
-      ) : (
-        <button type="button" className="launcher" onClick={() => setOpen(true)}>
-          Guide
-        </button>
-      )}
     </>
   )
 }
