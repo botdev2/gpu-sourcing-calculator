@@ -37,6 +37,7 @@ export type Mission = {
   hoursPerYear: number
   years: number
   utilization: number
+  gb300?: number
 }
 
 export type QuoteLine = {

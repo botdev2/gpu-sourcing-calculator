@@ -706,6 +706,13 @@ footer p { margin: 0; }
 .kyc { display: grid; gap: 8px; max-height: 280px; overflow: auto; padding-right: 4px; }
 .kyc .field { margin: 0; }
 
+.gb300 { margin-top: 12px; }
+.scale-note { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+.scale { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
+.scale div { padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--wash); }
+.scale span, .scale em { display: block; color: var(--muted); font-size: 12px; font-style: normal; }
+.scale strong { display: block; margin: 2px 0; font-size: 22px; letter-spacing: -0.04em; }
+
 @media (max-width: 760px) {
   .paths { grid-template-columns: 1fr; }
   .front { padding: 12px 12px 88px; }

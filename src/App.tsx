@@ -47,7 +47,7 @@ const PROFILES = [
   {
     id: "config1" as const,
     label: "Configuration 1",
-    copy: "One air-cooled Dell PowerEdge XE9780 with eight B300 SXM GPUs. Lines with no public price stay out of the total.",
+    copy: "One server is an 8-GPU B300 board. Nine servers make one GB300. Lines with no public price stay out of the total.",
   },
   {
     id: "config2" as const,
@@ -287,6 +287,13 @@ export function App({
             <p className="hint">{profileCopy}</p>
 
             {fixed ? (
+              <>
+                {mission.profile === "config1" ? (
+                  <Gb300Scale
+                    count={mission.gb300 || 6}
+                    onChange={(gb300) => shape({ gb300 })}
+                  />
+                ) : null}
               <ul className="spec">
                 {(mission.profile === "config1" ? CONFIG_1 : CONFIG_2).map((line) => {
                   const cut = line.indexOf(": ")
@@ -300,6 +307,7 @@ export function App({
                   )
                 })}
               </ul>
+              </>
             ) : rackScale ? (
               <Field label="NVL72 racks" hint="Each rack includes 72 GPUs.">
                 <input
@@ -653,6 +661,11 @@ export function App({
             <div className="panel-body">
               <p className="kicker">Source capex</p>
               <p className="total">{money(quote.totals.capexSource)}</p>
+              {quote.mission.profile === "config1" && (quote.mission.gb300 || 0) > 0 ? (
+                <p className="scale-note">
+                  {quote.mission.gb300} GB300 · {quote.mission.gb300! * 9} servers · {quote.facility.gpuCount.toLocaleString("en-US")} B300
+                </p>
+              ) : null}
               <dl className="rows">
                 <div>
                   <dt>Hardware</dt>
@@ -850,6 +863,44 @@ export function App({
         </p>
       </footer>
     </>
+  )
+}
+
+function Gb300Scale({ count, onChange }: { count: number; onChange: (count: number) => void }) {
+  const servers = count * 9
+  const gpus = 8 * servers
+  return (
+    <div className="gb300">
+      <label className="field">
+        <span>GB300 systems</span>
+        <input
+          type="number"
+          min={1}
+          max={32}
+          value={count}
+          onChange={(event) => onChange(Math.min(32, Math.max(1, Math.round(Number(event.target.value) || 1))))}
+          onWheel={(event) => event.currentTarget.blur()}
+        />
+      </label>
+      <p className="scale-note">1 GB300 = 9 servers × 8 B300 = 72 B300</p>
+      <div className="scale">
+        <div>
+          <span>Servers</span>
+          <strong>{servers.toLocaleString("en-US")}</strong>
+          <em>{count} × 9</em>
+        </div>
+        <div>
+          <span>B300</span>
+          <strong>{gpus.toLocaleString("en-US")}</strong>
+          <em>8 × 9 × {count}</em>
+        </div>
+        <div>
+          <span>Per GB300</span>
+          <strong>72</strong>
+          <em>8 × 9</em>
+        </div>
+      </div>
+    </div>
   )
 }
 

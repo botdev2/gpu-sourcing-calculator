@@ -81,6 +81,7 @@ export const quoteSchema = {
         hoursPerYear: { type: "integer", minimum: 1, maximum: 8760 },
         years: { type: "integer", minimum: 1, maximum: 7 },
         utilization: { type: "number", minimum: 0.05, maximum: 1 },
+        gb300: { type: "integer", minimum: 0, maximum: 32 },
       },
     },
     lines: {

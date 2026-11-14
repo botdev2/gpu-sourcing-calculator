@@ -42,6 +42,7 @@ export function cleanMission(input = {}) {
     hoursPerYear: clampInt(input.hoursPerYear, 1, 8760, 8760),
     years: clampInt(input.years, 1, 7, 3),
     utilization: round3(clampNum(input.utilization, 0.05, 1, 0.7)),
+    gb300: clampInt(input.gb300, 0, 32, 0),
   }
 }
 
@@ -101,7 +102,11 @@ function placeRacks(pricedLines, byId, mission) {
     return racks
   }
 
-  const rackCount = Math.max(1, qtyOf("rack-42"))
+  const chassisU = pricedLines
+    .filter((line) => byId[line.sku]?.category === "chassis")
+    .reduce((sum, line) => sum + line.qty * (byId[line.sku]?.rackU || 0), 0)
+  const namedRacks = qtyOf("rack-42")
+  const rackCount = namedRacks > 0 ? namedRacks : Math.max(chassisU > 0 ? Math.ceil(chassisU / 40) : 0, chassisU > 0 ? 1 : 0)
   const racks = Array.from({ length: rackCount }, (_, i) => ({
     id: `R${i + 1}`,
     title: `Rack ${i + 1}`,
@@ -217,8 +222,11 @@ export function priceQuote({ lines, mission, catalog }) {
   const racksFromLines = priced
     .filter((line) => line.sku === "rack-42" || line.sku === "nvl72")
     .reduce((sum, line) => sum + line.qty, 0)
-  const hasChassis = priced.some((line) => byId[line.sku]?.category === "chassis" && byId[line.sku]?.rackU > 0)
-  const racks = racksFromLines || (hasChassis ? 1 : 0)
+  const chassisU = priced.reduce((sum, line) => {
+    const item = byId[line.sku]
+    return item?.category === "chassis" ? sum + line.qty * (item.rackU || 0) : sum
+  }, 0)
+  const racks = racksFromLines || (chassisU > 0 ? Math.max(1, Math.ceil(chassisU / 40)) : 0)
   const nodeKw = nodeCount > 0 ? round2(itKw / nodeCount) : round2(itKw / Math.max(racks, 1))
   const critical = priced.reduce((best, line) => (line.leadWeeks > (best?.leadWeeks || 0) ? line : best), null)
   const rackBudgetKw = priced.some((line) => line.sku === "nvl72") ? 120 : priced.some((line) => line.sku === "cdu-inrack") ? 80 : 15

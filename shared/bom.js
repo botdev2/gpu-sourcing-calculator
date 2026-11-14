@@ -57,7 +57,9 @@ export function buildBom(mission, catalog) {
   const profile = ["inference", "rack", "config1", "config2"].includes(mission.profile) ? mission.profile : "training"
 
   if (FIXED[profile]) {
-    for (const [id, qty] of FIXED[profile]) add(lines, byId, id, qty)
+    const gb300 = Math.round(Number(mission.gb300))
+    const servers = profile === "config1" && Number.isFinite(gb300) && gb300 > 0 ? gb300 * 9 : 1
+    for (const [id, qty] of FIXED[profile]) add(lines, byId, id, qty * servers)
     return lines
   }
 

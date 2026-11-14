@@ -3,6 +3,7 @@ export const PRESETS = {
     profile: "config1",
     acceleratorId: "hgx-b300-nvl8",
     nodes: 1,
+    gb300: 6,
     gpusPerNode: 8,
     fabric: "infiniband",
     cooling: "air",
